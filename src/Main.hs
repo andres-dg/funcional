@@ -56,29 +56,25 @@ getMtxShape pix = (R.Z R.:. (fromIntegral pixbufGetWidth pix :: Int) R.:. (fromI
 import System.Environment
 import Data.Array.Repa                          as R
 import Data.Array.Repa.Algorithms.Pixel         as R
-import Data.Array.Repa.IO.BMP
-import Data.Array.Repa.IO.Timing
 import Codec.Picture                            as C
 import Prelude                          hiding (compare)
-import Control.Monad
 import Gradient
 --import Converter
-import Debug.Trace
+
+type RGB8 = (Pixel8, Pixel8, Pixel8)
 
 main :: IO ()
 main = do
   [path, path'] <- getArgs
   eimg <- readImage path
-  case eimg of
-    Left err -> putStrLn ("Could not read image: " Prelude.++ err)
-    Right (ImageRGB8 img) -> do
-      gray <- (R.computeUnboxedP . toGray . fromImage) img
-      edges <- sobel gray
-      --color <- R.computeUnboxedP $ toRGB gray
-      (savePngImage path' . ImageY8 . toGrayImage) edges
-    Right _ -> putStrLn "Unexpected pixel format"
+  let img = case eimg of Right (ImageRGB8 x) -> x
+  gray <- loadGrayImage img
+  result <- normalFilter gray 3 1
 
-type RGB8 = (Pixel8, Pixel8, Pixel8)
+  (savePngImage path' . ImageY8 . toGrayImage) result
+
+loadGrayImage :: Monad m => Image PixelRGB8 -> m GImage
+loadGrayImage = (R.computeUnboxedP . toGray . fromImage)
 
 -- | Produce delayed Repa array from image with true color pixels.
 fromImage :: Image PixelRGB8 -> Array D DIM2 RGB8
@@ -113,69 +109,14 @@ toGray = R.map floatLuminanceOfRGB8
 
 sobel :: Monad m => GImage -> m GImage
 sobel img = do
-       gX <- sobelX img 0
-       gY <- sobelY img 0
+       gX <- convolute img 0 1 sobelX
+       gY <- convolute img 0 1 sobelY
        computeUnboxedP $ R.zipWith magnitude gX gY
 
--- | Determine the squared magnitude of a vector.
-magnitude :: Float -> Float -> Float
-{-# INLINE magnitude #-}
-magnitude x y
-        = sqrt (x * x + y * y)
-
-
-
-
-{--
-
-run iterations fileIn fileOut
- = do   -- Load the source image and convert it to greyscale
-       traceEventIO "******** Sobel Read Image"
-
-       eimg <- readImage path
-       case eimg of
-              Left err -> die ("Could not read image: " ++ err)
-              Right (ImageRGB8 img) -> loop 1 $ computeP $ R.map floatLuminanceOfRGB8 (fromImage img)
-              Right _ -> die "Unexpected pixel format"
-
-        inputImage      <- liftM (either (error . show) id) 
-                        $ fromImage (readImage fileIn)
-
-        traceEventIO "******** Sobel Luminance"
-        (greyImage :: Array U DIM2 Float)
-                        <- computeP
-                        $  R.map floatLuminanceOfRGB8 inputImage
-                
-        -- Run the filter.
-        traceEventIO "******** Sobel Loop Start"
-        ((gX, gY), tElapsed)
-                       <- time $ loop iterations greyImage
-
-        traceEventIO "******** Sobel Loop End"
-        putStr $ prettyTime tElapsed
-        
-        -- Write out the magnitute of the vector gradient as the result image.
-        traceEventIO "******** Sobel Magnitude"
-        outImage       <- computeUnboxedP
-                       $  R.map rgb8OfGreyFloat  
-                       $  R.map (/ 3)
-                       $  R.zipWith magnitude gX gY     
-
-        traceEventIO "******** Sobel Write Image"
-        writeImageToBMP fileOut outImage
-
-loop :: Int -> GImage -> IO (GImage, GImage)
-loop n img
- = img `deepSeqArray`
-   if n == 0
-    then return (img, img)
-    else do 
-        traceEventIO $ "******** Sobel Loop " Prelude.++ show n
-        gX      <- sobelX img 0
-        gY      <- sobelX img 0       
-        if (n == 1) 
-                then return (gX, gY)
-                else loop (n - 1) img
+normalFilter :: Monad m => GImage -> Int -> Float -> m GImage
+normalFilter img size sigma = do
+    res <- niceGaussian img 0 size sigma
+    normalize res
 
 
 -- | Determine the squared magnitude of a vector.
@@ -183,6 +124,4 @@ magnitude :: Float -> Float -> Float
 {-# INLINE magnitude #-}
 magnitude x y
         = sqrt (x * x + y * y)
-
---}
 
