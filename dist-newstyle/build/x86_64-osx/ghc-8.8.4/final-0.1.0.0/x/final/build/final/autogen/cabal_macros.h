@@ -33,6 +33,39 @@
   (major1) == 4 && (major2) == 13 && (minor) <= 0)
 #endif /* MIN_VERSION_base */
 
+/* package gi-gdkpixbuf-2.0.24 */
+#ifndef VERSION_gi_gdkpixbuf
+#define VERSION_gi_gdkpixbuf "2.0.24"
+#endif /* VERSION_gi_gdkpixbuf */
+#ifndef MIN_VERSION_gi_gdkpixbuf
+#define MIN_VERSION_gi_gdkpixbuf(major1,major2,minor) (\
+  (major1) <  2 || \
+  (major1) == 2 && (major2) <  0 || \
+  (major1) == 2 && (major2) == 0 && (minor) <= 24)
+#endif /* MIN_VERSION_gi_gdkpixbuf */
+
+/* package gi-gtk-3.0.36 */
+#ifndef VERSION_gi_gtk
+#define VERSION_gi_gtk "3.0.36"
+#endif /* VERSION_gi_gtk */
+#ifndef MIN_VERSION_gi_gtk
+#define MIN_VERSION_gi_gtk(major1,major2,minor) (\
+  (major1) <  3 || \
+  (major1) == 3 && (major2) <  0 || \
+  (major1) == 3 && (major2) == 0 && (minor) <= 36)
+#endif /* MIN_VERSION_gi_gtk */
+
+/* package normaldistribution-1.1.0.3 */
+#ifndef VERSION_normaldistribution
+#define VERSION_normaldistribution "1.1.0.3"
+#endif /* VERSION_normaldistribution */
+#ifndef MIN_VERSION_normaldistribution
+#define MIN_VERSION_normaldistribution(major1,major2,minor) (\
+  (major1) <  1 || \
+  (major1) == 1 && (major2) <  1 || \
+  (major1) == 1 && (major2) == 1 && (minor) <= 0)
+#endif /* MIN_VERSION_normaldistribution */
+
 /* package repa-3.4.1.4 */
 #ifndef VERSION_repa
 #define VERSION_repa "3.4.1.4"
@@ -65,6 +98,17 @@
   (major1) == 3 && (major2) <  4 || \
   (major1) == 3 && (major2) == 4 && (minor) <= 1)
 #endif /* MIN_VERSION_repa_io */
+
+/* package text-1.2.4.0 */
+#ifndef VERSION_text
+#define VERSION_text "1.2.4.0"
+#endif /* VERSION_text */
+#ifndef MIN_VERSION_text
+#define MIN_VERSION_text(major1,major2,minor) (\
+  (major1) <  1 || \
+  (major1) == 1 && (major2) <  2 || \
+  (major1) == 1 && (major2) == 2 && (minor) <= 4)
+#endif /* MIN_VERSION_text */
 
 /* tool alex-3.2.5 */
 #ifndef TOOL_VERSION_alex

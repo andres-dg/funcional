@@ -1,13 +1,13 @@
-{-
-import qualified GI.Gtk as GI (main, init)
+{-# LANGUAGE PackageImports, BangPatterns, QuasiQuotes, PatternGuards #-}
+{-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-incomplete-patterns #-}
 
-import Control.Monad
-import Control.Monad.IO.Class
-import Data.IORef
-import GI.GdkPixbuf.Objects.Pixbuf
+import qualified GI.Gtk as GI (main, init)
+import qualified Data.Text as T
+import Graphic
+import Noise
 
 import GI.Gtk.Enums
-       (Orientation(..), WindowType(..), ButtonBoxStyle(..))
+       (Orientation(..), WindowType(..), ButtonBoxStyle(..), FileChooserAction(..))
 
 import GI.Gtk.Objects.Image
        (imageNewFromFile)
@@ -15,113 +15,85 @@ import GI.Gtk.Objects.Image
 import GI.Gtk
        (buttonBoxNew, buttonBoxSetChildSecondary, widgetShowAll,
         setButtonBoxLayoutStyle, buttonNewWithLabel, setContainerChild,
-        setContainerBorderWidth, mainQuit, onWidgetDestroy, windowNew)
+        setContainerBorderWidth, mainQuit, onWidgetDestroy, windowNew, boxPackStart,
+       containerAdd, boxNew, onButtonClicked, fileChooserButtonNew, afterFileChooserButtonFileSet,
+       fileChooserGetFilename, imageSetFromFile, FileChooserButton, fileChooserSetFilename)
 
-import qualified Data.Array.Repa as R
+import Control.Monad.IO.Class
 
-import Data.Array.Repa.Shape
+sampleImage :: FilePath
+sampleImage = "sample/lena-rgb.png"
 
-main :: IO ()
-main = do
-  GI.init Nothing      
-  window <- windowNew WindowTypeToplevel
-
-  onWidgetDestroy window mainQuit
-
-  setContainerBorderWidth window 10
-
-  image <- imageNewFromFile "sample/lena-rgb.png"
-
-  pbuf <- pixbufNewFromFile "sample/lena-rgb.png"
-
-  nChannels <- pixbufGetNChannels pbuf
-  width <- pixbufGetWidth pbuf
-  height <- pixbufGetHeight pbuf
-
-  print R.rank (R.Z R.:. (fromIntegral width :: Int) R.:. (fromIntegral height :: Int) R.:. (fromIntegral nChannels :: Int))
-
-  setContainerChild window image
-  widgetShowAll window  
-  GI.main
-
-getMtxShape :: Pixbuf -> sh
-getMtxShape pix = (R.Z R.:. (fromIntegral pixbufGetWidth pix :: Int) R.:. (fromIntegral pixbufGetHeight pix :: Int) R.:. (fromIntegral pixbufGetNChannels pix :: Int))
-
--}
-
-{-# LANGUAGE PackageImports, BangPatterns, QuasiQuotes, PatternGuards, ScopedTypeVariables, RecordWildCards #-}
-{-# OPTIONS -Wall -fno-warn-missing-signatures -fno-warn-incomplete-patterns #-}
-
--- | Apply Sobel operators to an image.
-import System.Environment
-import Data.Array.Repa                          as R
-import Data.Array.Repa.Algorithms.Pixel         as R
-import Codec.Picture                            as C
-import Prelude                          hiding (compare)
-import Gradient
---import Converter
-
-type RGB8 = (Pixel8, Pixel8, Pixel8)
+tmpImage :: FilePath
+tmpImage = "tmp.png"
 
 main :: IO ()
 main = do
-  [path, path'] <- getArgs
-  eimg <- readImage path
-  let img = case eimg of Right (ImageRGB8 x) -> x
-  gray <- loadGrayImage img
-  result <- normalFilter gray 3 1
+       GI.init Nothing      
+       window <- windowNew WindowTypeToplevel
 
-  (savePngImage path' . ImageY8 . toGrayImage) result
+       onWidgetDestroy window mainQuit
+       setContainerBorderWidth window 10
 
-loadGrayImage :: Monad m => Image PixelRGB8 -> m GImage
-loadGrayImage = (R.computeUnboxedP . toGray . fromImage)
+       hbuttonbox <- buttonBoxNew OrientationHorizontal
 
--- | Produce delayed Repa array from image with true color pixels.
-fromImage :: Image PixelRGB8 -> Array D DIM2 RGB8
-fromImage img@Image {..} =
-  R.fromFunction
-    (Z :. imageWidth :. imageHeight)
-    (\(Z :. x :. y) ->
-       let (PixelRGB8 r g b) = pixelAt img x y
-       in (r, g, b))
+       image <- imageNewFromFile sampleImage
 
--- | Get image with true color pixels from manifest Repa array.
-toImage :: Array U DIM2 RGB8 -> Image PixelRGB8
-toImage a = generateImage gen width height
-  where
-    Z :. width :. height = R.extent a
-    gen x y =
-      let (r,g,b) = a ! (Z :. x :. y)
-      in PixelRGB8 r g b
+       loadButton <- fileChooserButtonNew (T.pack "Load image") FileChooserActionOpen 
+       afterFileChooserButtonFileSet loadButton (do
+                                                        filename <- fileChooserGetFilename loadButton
+                                                        case filename of
+                                                               (Just x) -> imageSetFromFile image filename
+                                                               (Nothing) -> putStrLn "Nothing")
 
--- | Get image with true color pixels from manifest Repa array.
-toGrayImage :: Array U DIM2 Float -> Image Pixel8
-toGrayImage a = generateImage gen width height
-  where
-    Z :. width :. height = R.extent a
-    gen x y = round (255 * (a ! (Z :. x :. y)))
-
-toRGB :: Array D DIM2 Float -> Array D DIM2 RGB8
-toRGB = R.map (\x -> rgb8OfGreyFloat (x/3))
-
-toGray :: Array D DIM2 RGB8 -> Array D DIM2 Float
-toGray = R.map floatLuminanceOfRGB8
-
-sobel :: Monad m => GImage -> m GImage
-sobel img = do
-       gX <- convolute img 0 1 sobelX
-       gY <- convolute img 0 1 sobelY
-       computeUnboxedP $ R.zipWith magnitude gX gY
-
-normalFilter :: Monad m => GImage -> Int -> Float -> m GImage
-normalFilter img size sigma = do
-    res <- niceGaussian img 0 size sigma
-    normalize res
+       button2 <- buttonNewWithLabel $ T.pack "Filter"
+       onButtonClicked button2 (do
+                                  filename <- getFileName loadButton
+                                  transformImg filename tmpImage (normalFilter 3 7)
+                                  fileChooserSetFilename loadButton tmpImage
+                                  imageSetFromFile image (Just tmpImage))
 
 
--- | Determine the squared magnitude of a vector.
-magnitude :: Float -> Float -> Float
-{-# INLINE magnitude #-}
-magnitude x y
-        = sqrt (x * x + y * y)
+       button3 <- buttonNewWithLabel $ T.pack "Edges"
+
+       onButtonClicked button3 (do
+                                  filename <- getFileName loadButton
+                                  transformImg filename tmpImage sobel
+                                  fileChooserSetFilename loadButton tmpImage
+                                  imageSetFromFile image (Just tmpImage))
+
+       button4 <- buttonNewWithLabel $ T.pack "Noise"
+
+       onButtonClicked button4 (do
+                                  filename <- getFileName loadButton
+                                  transformImg filename tmpImage (applyNoise 5)
+                                  fileChooserSetFilename loadButton tmpImage
+                                  imageSetFromFile image (Just tmpImage))
+
+       -- Add each button to the button box with the default packing and padding
+       mapM_ (setContainerChild hbuttonbox) [button2, button3, button4]
+
+       -- The final step is to display everything (the window and all the widgets
+       -- contained within it)
+
+       layout <- do
+              hb <- boxNew OrientationHorizontal 0
+              boxPackStart hb loadButton True True 0
+              vb <- boxNew OrientationVertical 0
+              boxPackStart vb hb True True 10
+              boxPackStart vb image True True 0
+              boxPackStart vb hbuttonbox False False 10
+              return vb
+       
+       containerAdd window layout
+       widgetShowAll window
+
+       GI.main
+
+getFileName :: FileChooserButton -> IO (FilePath)
+getFileName button = do
+                        filename <- fileChooserGetFilename button
+                        case filename of
+                                (Just x) -> return x
+                                (Nothing) -> return sampleImage
 

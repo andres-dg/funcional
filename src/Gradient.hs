@@ -27,10 +27,10 @@ convolute img bound norm stencil = computeP
 
 normalize :: Monad m => GImage -> m GImage
 normalize img = do
-        maxVal <- Gradient.max img
         minVal <- Gradient.min img
         let aux = computeUnboxedS $ R.map (\x -> x -minVal) img
-        return $ computeUnboxedS $ R.map (/ maxVal) img
+        maxVal <- Gradient.max aux
+        return $ computeUnboxedS $ R.map (/ maxVal) aux
 
 max :: Monad m => GImage -> m Float
 max = foldAllP (\x y -> if x < y then y else x) 0
@@ -63,7 +63,7 @@ gaussian img bound = convolute img bound 16 [stencil2|  1  2  1
 niceGaussian :: Monad m => GImage -> Float -> Int -> Float -> m GImage
 niceGaussian img bound s sigma = do
         let st = normalStencil s sigma
-        let stSum = sumStencil (Z :. s :. s) sigma
+        let stSum = sumStencil (Z :. (s :: Int) :. (s :: Int)) sigma
         convolute img bound stSum st
 
 sobelX :: Stencil DIM2 Float
