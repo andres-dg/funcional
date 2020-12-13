@@ -10,6 +10,7 @@ module Graphic (Transform, transformImg, normalFilter, sobel)
 where
 
 import System.Environment
+import Data.Array.Repa.IO.Timing
 import Data.Array.Repa                          as R
 import Data.Array.Repa.Algorithms.Pixel         as R
 import Codec.Picture                            as C
@@ -28,7 +29,8 @@ transformImg input output transform = do
             Right (ImageRGB8 x) -> loadGrayImageFromRGB x
             Right (ImageY8 y) -> loadGrayImage y
 
-  result <- transform img
+  (result, tElapsed) <- time $ transform img
+  putStr $ prettyTime tElapsed
   normed <- normalize result
 
   (savePngImage output . ImageY8 . toGrayImage) normed
